@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 )
@@ -21,10 +22,17 @@ func main() {
   }
   
   buffer := make([]byte, 1024)
-  n, err := conn.Read(buffer)
-  if err != nil {
-    log.Fatal(err)
-  }
+  conn.Read(buffer)
+  
+  body := "Halo's light"
+  response := fmt.Sprintf(
+      "HTTP/1.1 200 OK\r\n"+
+      "Content-Type: text/plain\r\n"+
+      "Content-Length: %d\r\n"+
+      "\r\n"+
+      "%s",
+    len(body), body,
+    )
 
-  conn.Write(buffer[:n])
+  conn.Write([]byte(response))
 }

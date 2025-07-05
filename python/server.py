@@ -11,8 +11,18 @@ def main():
     server_socket.listen()
 
     client_socket, addr = server_socket.accept()
-    data = client_socket.recv(1024)
-    client_socket.sendall(data) 
+    client_socket.recv(1024)
+
+    body = "Halo's light"
+    response = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        "\r\n"
+        f"{body}"
+    )
+
+    client_socket.sendall(response.encode()) 
 
     client_socket.close()
     server_socket.close()
