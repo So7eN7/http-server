@@ -11,17 +11,32 @@ def main():
     server_socket.listen()
 
     client_socket, addr = server_socket.accept()
-    client_socket.recv(1024)
+    data = client_socket.recv(1024)
 
-    body = "Halo's light"
-    response = (
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        f"Content-Length: {len(body)}\r\n"
-        "\r\n"
-        f"{body}"
-    )
+    data = data.decode()
+    first_line = data.split("\r\n")[0]
+    try:
+        method, path, _ = first_line.split(" ")
+    except ValueError:
+        method, path = "", ""
 
+    if method == "GET" and path == "/":   
+        body = "Halo's light"
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/plain\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "\r\n"
+            f"{body}"
+        )
+    else:
+        body = ""
+        response = (
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 0\r\n"
+            "\r\n"
+        )
     client_socket.sendall(response.encode()) 
 
     client_socket.close()
