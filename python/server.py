@@ -3,17 +3,9 @@ import socket
 HOST="localhost"
 PORT=8080
 
-def main():
-    # Setting up the socket
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen()
+def handle_connection(client_socket):
+    data = client_socket.recv(1024).decode()
 
-    client_socket, addr = server_socket.accept()
-    data = client_socket.recv(1024)
-
-    data = data.decode()
     first_line = data.split("\r\n")[0]
     try:
         method, path, _ = first_line.split(" ")
@@ -40,6 +32,20 @@ def main():
     client_socket.sendall(response.encode()) 
 
     client_socket.close()
+
+
+def main():
+    # Setting up the socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen()
+
+    print(f"Server running on: {HOST}:{PORT}...")
+    while True:
+        client_socket, addr = server_socket.accept()
+        handle_connection(client_socket)
+
     server_socket.close()
 
 if __name__ == "__main__":
