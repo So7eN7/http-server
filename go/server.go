@@ -63,6 +63,6 @@ func main() {
       log.Println("Error accepting: ", err)
       continue
     }
-    handleConnection(conn)
+    go handleConnection(conn)
   }
 }

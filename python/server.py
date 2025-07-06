@@ -1,37 +1,39 @@
 import socket
+import threading
 
 HOST="localhost"
 PORT=8080
 
 def handle_connection(client_socket):
-    data = client_socket.recv(1024).decode()
-
-    first_line = data.split("\r\n")[0]
     try:
-        method, path, _ = first_line.split(" ")
-    except ValueError:
-        method, path = "", ""
+        data = client_socket.recv(1024).decode()
 
-    if method == "GET" and path == "/":   
-        body = "Halo's light"
-        response = (
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/plain\r\n"
-            f"Content-Length: {len(body)}\r\n"
-            "\r\n"
-            f"{body}"
-        )
-    else:
-        body = ""
-        response = (
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 0\r\n"
-            "\r\n"
-        )
-    client_socket.sendall(response.encode()) 
+        first_line = data.split("\r\n")[0]
+        try:
+            method, path, _ = first_line.split(" ")
+        except ValueError:
+            method, path = "", ""
 
-    client_socket.close()
+        if method == "GET" and path == "/":   
+            body = "Halo's light"
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "\r\n"
+                f"{body}"
+            )
+        else:
+            body = ""
+            response = (
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 0\r\n"
+                "\r\n"
+            )
+        client_socket.sendall(response.encode()) 
+    finally:
+        client_socket.close()
 
 
 def main():
@@ -44,7 +46,8 @@ def main():
     print(f"Server running on: {HOST}:{PORT}...")
     while True:
         client_socket, addr = server_socket.accept()
-        handle_connection(client_socket)
+        thread = threading.Thread(target=handle_connection, args=(client_socket,))
+        thread.start()
 
     server_socket.close()
 
