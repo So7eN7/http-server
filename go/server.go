@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+  "io/ioutil"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -68,6 +71,41 @@ func handleConnection(conn net.Conn) {
         "%s",
       len(body), body,
     )
+  } else if method == "GET" && strings.HasPrefix(path, "/files/") {
+    filename := path[len("/files/"):]
+    // Preventing file traversal
+    if strings.Contains(filename, "..") {
+      response = "HTTP/1.1 400 Bad Request\r\n" +
+                "Content-Type: text/plain\r\n" +
+                "Content-Length: 0\r\n" +
+                "\r\n"
+    } else {
+      filePath := filepath.Join("files", filename)
+      if _, err := os.Stat(filePath); err == nil {
+        content, err := ioutil.ReadFile(filePath)
+        if err != nil {
+          log.Println("Error reading file:", err)
+          response = "HTTP/1.1 500 Internal Server Error\r\n" +
+                        "Content-Type: text/plain\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "\r\n"
+        } else {
+          response = fmt.Sprintf(
+                        "HTTP/1.1 200 OK\r\n"+
+                            "Content-Type: text/plain\r\n"+
+                            "Content-Length: %d\r\n"+
+                            "\r\n"+
+                            "%s",
+                        len(content), content,
+                    )
+        }
+      } else {
+        response = "HTTP/1.1 404 Not Found\r\n" +
+            "Content-Type: text/plain\r\n" +
+            "Content-Length: 0\r\n" +
+            "\r\n"
+      }
+    }
   } else if method == "POST" && path == "/halo" {
     contentLength, _ := strconv.Atoi(headers["content-length"])
     if contentLength > 0 {

@@ -1,5 +1,6 @@
 import socket
 import threading
+import os
 
 HOST="localhost"
 PORT=8080
@@ -49,6 +50,35 @@ def handle_connection(client_socket):
                 "\r\n"
                 f"{body}"
             )
+        elif method == "GET" and path.startswith("/files/"):
+            filename = path[len("/files/"):]
+            # Preventing directory traversal
+            if ".." in filename:
+                response = (
+                    "HTTP/1.1 400 Bad Request\r\n"
+                    "Content-Type: text/plain\r\n"
+                    "Content-Length: 0\r\n"
+                    "\r\n"
+                )
+            else:
+                file_path = os.path.join("files", filename)
+                if os.path.isfile(file_path):
+                    with open(file_path, "r") as f:
+                        body = f.read()
+                    response = (
+                        "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/plain\r\n"
+                        f"Content-Length: {len(body)}\r\n"
+                        "\r\n"
+                        f"{body}"
+                    )
+                else:
+                    response = (
+                        "HTTP/1.1 404 Not Found\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "Content-Length: 0\r\n"
+                        "\r\n"
+                    )       
         elif method == "POST" and path == "/halo":
             content_length = int(headers.get("content-length", "0"))
             if content_length > 0: 
