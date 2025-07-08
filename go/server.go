@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+  "time"
 )
 
 const ADDR = "localhost:8080"
@@ -24,7 +25,7 @@ func parseRequest(data string) (string, string, map[string]string, string) {
   lines := strings.Split(headersPart, "\r\n")
   firstLine := lines[0]
   parts = strings.SplitN(firstLine, " ", 3)
-  if len(parts) < 2 {
+  if len(parts) != 3 || parts[2] != "HTTP/1.1" {
     return "", "", nil, ""
   }
   method, path := parts[0], parts[1]
@@ -46,12 +47,19 @@ func handleConnection(conn net.Conn) {
   buffer := make([]byte, 1024)
   n, err := conn.Read(buffer)
   if err != nil {
-    log.Fatal(err)
+    log.Printf("[%s] Error reading: %v", time.Now().Format(time.RFC1123), err)
+    response := "HTTP/1.1 400 Bad Request\r\n" +
+            "Content-Type: text/plain\r\n" +
+            "Content-Length: 0\r\n" +
+            "\r\n"
+        conn.Write([]byte(response))
+        return
   }
   data := string(buffer[:n])
   
   method, path, headers, body := parseRequest(data)
   if method == "" { // Malformed request
+    log.Printf("[%s] Malformed request", time.Now().Format(time.RFC1123))
     response := "HTTP/1.1 400 Bad Request\r\n" +
             "Content-Type: text/plain\r\n" +
             "Content-Length: 0\r\n" +
@@ -75,6 +83,7 @@ func handleConnection(conn net.Conn) {
     filename := path[len("/files/"):]
     // Preventing file traversal
     if strings.Contains(filename, "..") {
+      log.Printf("[%s] Directory traversal attempt: %s", time.Now().Format(time.RFC1123), filename)
       response = "HTTP/1.1 400 Bad Request\r\n" +
                 "Content-Type: text/plain\r\n" +
                 "Content-Length: 0\r\n" +
@@ -84,11 +93,11 @@ func handleConnection(conn net.Conn) {
       if _, err := os.Stat(filePath); err == nil {
         content, err := ioutil.ReadFile(filePath)
         if err != nil {
-          log.Println("Error reading file:", err)
-          response = "HTTP/1.1 500 Internal Server Error\r\n" +
+          log.Printf("[%s] Error reading file: %v", time.Now().Format(time.RFC1123), err)
+                    response = "HTTP/1.1 500 Internal Server Error\r\n" +
                         "Content-Type: text/plain\r\n" +
                         "Content-Length: 0\r\n" +
-                        "\r\n"
+                        "\r\n"        
         } else {
           response = fmt.Sprintf(
                         "HTTP/1.1 200 OK\r\n"+
@@ -107,20 +116,38 @@ func handleConnection(conn net.Conn) {
       }
     }
   } else if method == "POST" && path == "/halo" {
+      if _, ok := headers["content-length"]; !ok {
+        log.Printf("[%s] Missing Content-Length for POST", time.Now().Format(time.RFC1123))
+        response = "HTTP/1.1 400 Bad Request\r\n" +
+                "Content-Type: text/plain\r\n" +
+                "Content-Length: 0\r\n" +
+                "\r\n"
+    } else { 
     contentLength, _ := strconv.Atoi(headers["content-length"])
-    if contentLength > 0 {
+      if err != nil || contentLength < 0 {
+        log.Printf("[%s] Invalid Content-Length: %v", time.Now().Format(time.RFC1123), err)
+        response = "HTTP/1.1 400 Bad Request\r\n" +
+                    "Content-Type: text/plain\r\n" +
+                    "Content-Length: 0\r\n" +
+                    "\r\n"
+      } else {
       // Ensuring we have the full body
       for len(body) < contentLength {
         buf := make([]byte, 1024)
         n, err := conn.Read(buf)
         if err != nil {
-          log.Println("Error reading body:", err)
+          log.Printf("[%s] Error reading body: %v", time.Now().Format(time.RFC1123), err)
+          response = "HTTP/1.1 500 Internal Server Error\r\n" +
+                            "Content-Type: text/plain\r\n" +
+                            "Content-Length: 0\r\n" +
+                            "\r\n"          
+          conn.Write([]byte(response))
           return
         }
         body += string(buf[:n])
       }
       body = body[:contentLength]
-    }
+    
     response = fmt.Sprintf(
             "HTTP/1.1 200 OK\r\n"+
                 "Content-Type: text/plain\r\n"+
@@ -129,14 +156,18 @@ func handleConnection(conn net.Conn) {
                 "%s",
             len(body), body,
       )
+      }
+    }
   } else {
     response = "HTTP/1.1 404 Not Found\r\n" +
             "Content-Type: text/plain\r\n" +
             "Content-Length: 0\r\n" +
             "\r\n"
   }
-  conn.Write([]byte(response))
 
+  if _, err := conn.Write([]byte(response)); err != nil {
+    log.Printf("[%s] Error writing response: %v", time.Now().Format(time.RFC1123), err)
+  }
 }
 
 func main() {
@@ -151,7 +182,7 @@ func main() {
   for {
   conn, err := listener.Accept()
   if err != nil {
-      log.Println("Error accepting: ", err)
+      log.Printf("[%s] Error accepting: %v", time.Now().Format(time.RFC1123), err)
       continue
     }
     go handleConnection(conn)
