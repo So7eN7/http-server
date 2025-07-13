@@ -173,6 +173,29 @@ def handle_connection(client_socket):
                             f"{connection_header}"
                             "\r\n"
                         ).encode()
+            # Handle GET /stream (sending 1 up to 10 in strings as chunked response)
+            elif method == "GET" and path == "/stream":
+                try:
+                    headers_response = (
+                        "HTTP/1.1 200 OK\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "Transfer-Encoding: chunked\r\n"
+                        f"{connection_header}"
+                        "\r\n"
+                    ).encode()
+                    client_socket.sendall(headers_response)
+                    
+                    for i in range(1, 11):
+                        chunk_data = str(i)
+                        # Chunk format: <size in hex>\r\n<data>\r\n
+                        chunk = f"{len(chunk_data):x}\r\n{chunk_data}\r\n".encode()
+                        client_socket.sendall(chunk)
+                        time.sleep(1)
+                    # Final chunk  
+                    client_socket.sendall(b"0\r\n\r\n")
+                except Exception as e:
+                    print(f"[{time.asctime()}] Streaming error: {e}")
+                    return
             # Handle POST /files/filename
             elif method == "POST" and path.startswith("/files/"):
                 filename = path[len("/files/"):]

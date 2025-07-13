@@ -168,6 +168,36 @@ func handleConnection(conn net.Conn) {
                     )
                 }
             }
+          // Handle GET /stream (sending 1 up to 10 in strings as chunked response)
+        } else if method == "GET" && path == "/stream" {
+            headersResponse := fmt.Sprintf(
+                "HTTP/1.1 200 OK\r\n"+
+                    "Content-Type: text/plain\r\n"+
+                    "Transfer-Encoding: chunked\r\n"+
+                    "%s"+
+                    "\r\n",
+                connectionHeader,
+            )
+            if _, err := conn.Write([]byte(headersResponse)); err != nil {
+                log.Printf("[%s] Error writing headers: %v", time.Now().Format(time.RFC1123), err)
+                return
+            }
+            
+            for i := 1; i <= 10; i++ {
+              chunkData := fmt.Sprintf("%d", i) 
+              // Chunk format: <size in hex>\r\n<data>\r\n
+              chunk := fmt.Sprintf("%x\r\n%s\r\n", len(chunkData), chunkData)
+              if _, err := conn.Write([]byte(chunk)); err != nil {
+                    log.Printf("[%s] Error writing chunk %d: %v", time.Now().Format(time.RFC1123), i, err)
+                    return
+              }
+              time.Sleep(1 * time.Second)
+            }
+            // Final chunk
+            if _, err := conn.Write([]byte("0\r\n\r\n")); err != nil {
+                log.Printf("[%s] Error writing final chunk: %v", time.Now().Format(time.RFC1123), err)
+                return
+            }
           // Handle POST /files/filename
         } else if method == "POST" && strings.HasPrefix(path, "/files/") {
             filename := path[len("/files"):]
